@@ -91,34 +91,50 @@ internal sealed class NetEncryption
     /// <returns>Whether the operation was successful. If this fails, you likely want to drop the connection.</returns>
     public unsafe bool TryDecrypt(NetIncomingMessage message)
     {
+        if (message.LengthBytes < sizeof(ulong) + CryptoAeadXChaCha20Poly1305Ietf.AddBytes)
+            return false;
+
         var nonce = message.ReadUInt64();
         var cipherText = message.Data.AsSpan(sizeof(ulong), message.LengthBytes - sizeof(ulong));
 
         var buffer = ArrayPool<byte>.Shared.Rent(cipherText.Length);
-        cipherText.CopyTo(buffer);
 
-        Span<byte> nonceData = stackalloc byte[CryptoAeadXChaCha20Poly1305Ietf.NoncePublicBytes];
-        nonceData.Fill(0);
-        BinaryPrimitives.WriteUInt64LittleEndian(nonceData, nonce);
+        try
+        {
+            cipherText.CopyTo(buffer);
 
-        var result = CryptoAeadXChaCha20Poly1305Ietf.Decrypt(
-            // plaintext
-            message.Data,
-            out var messageLength,
-            // ciphertext
-            buffer.AsSpan(0, cipherText.Length),
-            // additional data (unused)
-            ReadOnlySpan<byte>.Empty,
-            // nonce
-            nonceData,
-            // key
-            _key);
+            Span<byte> nonceData = stackalloc byte[CryptoAeadXChaCha20Poly1305Ietf.NoncePublicBytes];
+            nonceData.Fill(0);
+            BinaryPrimitives.WriteUInt64LittleEndian(nonceData, nonce);
 
-        message.Position = 0;
-        message.LengthBytes = messageLength;
+            var result = CryptoAeadXChaCha20Poly1305Ietf.Decrypt(
+                // plaintext
+                message.Data,
+                out var messageLength,
+                // ciphertext
+                buffer.AsSpan(0, cipherText.Length),
+                // additional data (unused)
+                ReadOnlySpan<byte>.Empty,
+                // nonce
+                nonceData,
+                // key
+                _key);
 
-        ArrayPool<byte>.Shared.Return(buffer);
+            if (result)
+            {
+                message.Position = 0;
+                message.LengthBytes = messageLength;
+            }
 
-        return result;
+            return result;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 }
