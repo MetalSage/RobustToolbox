@@ -2,7 +2,6 @@
 
     <!-- This file automatically reset by Tools/version.py -->
 
-    <PropertyGroup><Version>264.0.2-fix-net</Version></PropertyGroup>
+    <PropertyGroup><Version>264.0.2-fix-net-2</Version></PropertyGroup>
 
 </Project>
-
