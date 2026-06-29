@@ -91,6 +91,9 @@ internal sealed class NetEncryption
     /// <returns>Whether the operation was successful. If this fails, you likely want to drop the connection.</returns>
     public unsafe bool TryDecrypt(NetIncomingMessage message)
     {
+        if (message.LengthBytes < sizeof(ulong) + CryptoAeadXChaCha20Poly1305Ietf.AddBytes)
+            return false;
+
         var nonce = message.ReadUInt64();
         var cipherText = message.Data.AsSpan(sizeof(ulong), message.LengthBytes - sizeof(ulong));
 
